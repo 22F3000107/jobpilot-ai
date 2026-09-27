@@ -1,0 +1,50 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  background-color: #f6f8fc;
+  color: #172033;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+  letter-spacing: -0.5px;
+}
+
+.stats-card,
+.job-card {
+  border-radius: 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stats-card:hover,
+.job-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08) !important;
+}
+
+.form-control {
+  padding: 12px 14px;
+  border-radius: 10px;
+}
+
+.btn {
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.badge {
+  font-weight: 500;
+}
+
+footer {
+  font-size: 14px;
+}
