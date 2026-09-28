@@ -1,7 +1,6 @@
 <template>
   <div class="card job-card border-0 shadow-sm h-100">
     <div class="card-body d-flex flex-column">
-
       <div class="d-flex justify-content-between align-items-start mb-3">
         <span class="badge bg-primary-subtle text-primary">
           {{ job.job_type }}
@@ -40,20 +39,28 @@
           View Job
         </a>
 
-        <button class="btn btn-outline-secondary btn-sm">
+        <button
+          class="btn btn-outline-primary btn-sm"
+          @click="handleSave"
+        >
           Save Job
         </button>
       </div>
-
     </div>
   </div>
 </template>
 
 <script setup>
-defineProps({
+const props = defineProps({
   job: {
     type: Object,
     required: true,
   },
 });
+
+const emit = defineEmits(["save"]);
+
+function handleSave() {
+  emit("save", props.job);
+}
 </script>

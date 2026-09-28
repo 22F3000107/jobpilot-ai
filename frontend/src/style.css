@@ -48,3 +48,18 @@ h5 {
 footer {
   font-size: 14px;
 }
+
+.profile-card {
+  border-radius: 18px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.profile-card .form-label {
+  font-weight: 600;
+  color: #344054;
+}
+
+.profile-card textarea {
+  resize: vertical;
+}
