@@ -19,70 +19,175 @@
         </button>
       </div>
 
-      <!-- Statistics -->
-      <div class="row g-4 mb-5">
-        <div class="col-md-4">
-          <StatsCard
-            title="Jobs Found"
-            :value="jobs.length"
-            subtitle="Opportunities available"
-          />
-        </div>
+       <!-- Statistics -->
+<div class="row g-4 mb-5">
+  <div class="col-md-3">
+    <StatsCard
+      title="Jobs Found"
+      :value="jobs.length"
+      subtitle="Opportunities available"
+    />
+  </div>
 
-        <div class="col-md-4">
-          <StatsCard
-            title="Applications Sent"
-            value="0"
-            subtitle="Applications tracked"
-          />
-        </div>
+  <div class="col-md-3">
+    <StatsCard
+      title="Applications Sent"
+      :value="totalApplications"
+      subtitle="Applications tracked"
+    />
+  </div>
 
-        <div class="col-md-4">
-          <StatsCard
-            title="Interviews"
-            value="0"
-            subtitle="Interviews scheduled"
-          />
-        </div>
-      </div>
+  <div class="col-md-3">
+    <StatsCard
+      title="Interviews"
+      :value="totalInterviews"
+      subtitle="Interviews scheduled"
+    />
+  </div>
+
+  <div class="col-md-3">
+    <StatsCard
+      title="Saved Jobs"
+      :value="totalSavedJobs"
+      subtitle="Jobs saved for later"
+    />
+  </div>
+
+  <div class="col-md-3">
+    <StatsCard
+      title="Offers Received"
+      :value="totalOffers"
+      subtitle="Offers from applications"
+    />
+  </div>
+</div>
+
+      <!-- Reminder Summary -->
+<div class="row g-4 mb-5">
+  <div class="col-md-4">
+    <StatsCard
+      title="Overdue Reminders"
+      :value="overdueReminders"
+      subtitle="Follow-ups past their due date"
+    />
+  </div>
+
+  <div class="col-md-4">
+    <StatsCard
+      title="Due Today"
+      :value="remindersDueToday"
+      subtitle="Follow-ups scheduled for today"
+    />
+  </div>
+
+  <div class="col-md-4">
+    <StatsCard
+      title="Upcoming Reminders"
+      :value="upcomingReminders"
+      subtitle="Future follow-ups"
+    />
+  </div>
+</div>
+
+     <!-- Application Progress -->
+<section class="card border-0 shadow-sm p-4 mb-5">
+  <h3 class="fw-bold mb-4">Application Progress</h3>
+
+  <div
+    v-for="item in applicationStatusCounts"
+    :key="item.status"
+    class="mb-3"
+  >
+    <div class="d-flex justify-content-between mb-2">
+      <span class="fw-semibold">{{ item.status }}</span>
+      <span class="text-muted">{{ item.count }}</span>
+    </div>
+
+    <div class="progress" style="height: 10px;">
+      <div
+        class="progress-bar"
+        role="progressbar"
+        :style="{
+          width: totalApplications
+            ? `${(item.count / totalApplications) * 100}%`
+            : '0%',
+        }"
+        :aria-valuenow="item.count"
+        aria-valuemin="0"
+        :aria-valuemax="totalApplications"
+      ></div>
+    </div>
+  </div>
+</section>
 
       <!-- Search -->
-      <section class="mb-5">
-        <h3 class="fw-bold mb-3">Find Your Next Opportunity</h3>
+<section class="mb-5">
+  <h3 class="fw-bold mb-3">Find Your Next Opportunity</h3>
 
-        <div class="card border-0 shadow-sm p-3">
-          <div class="row g-3">
-            <div class="col-md-5">
-              <input
-                v-model="keyword"
-                type="text"
-                class="form-control"
-                placeholder="Search job title or skill..."
-                @input="filterJobs"
-              />
-            </div>
+  <div class="card border-0 shadow-sm p-3">
+    <div class="row g-3">
 
-            <div class="col-md-5">
-              <input
-                v-model="location"
-                type="text"
-                class="form-control"
-                placeholder="Search location..."
-                @input="filterJobs"
-              />
-            </div>
+      <!-- Keyword -->
+      <div class="col-md-4">
+        <input
+          v-model="keyword"
+          type="text"
+          class="form-control"
+          placeholder="Search job title or skill..."
+          @input="filterJobs"
+        />
+      </div>
 
-            <div class="col-md-2">
-              <button
-                class="btn btn-dark w-100"
-                @click="filterJobs"
-              >
-                Search
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <!-- Location -->
+      <div class="col-md-3">
+        <input
+          v-model="location"
+          type="text"
+          class="form-control"
+          placeholder="Search location..."
+          @input="filterJobs"
+        />
+      </div>
+
+      <!-- Job Type -->
+      <div class="col-md-3">
+        <select
+          v-model="jobType"
+          class="form-select"
+          @change="filterJobs"
+        >
+          <option value="">All Job Types</option>
+          <option value="Internship">Internship</option>
+          <option value="Full-time">Full-time</option>
+          <option value="Fresher">Fresher</option>
+        </select>
+      </div>
+
+      <!-- Search Button -->
+      <div class="col-md-2">
+        <button
+          class="btn btn-dark w-100"
+          @click="filterJobs"
+        >
+          Search
+        </button>
+      </div>
+     
+      <div class="row mt-3">
+  <div class="col-md-4">
+    <label class="form-label fw-semibold">Sort Jobs By</label>
+    <select v-model="sortBy" class="form-select">
+      <option value="match">Highest Match</option>
+      <option value="match-low">Lowest Match</option>
+      <option value="title">Job Title (A–Z)</option>
+    </select>
+  </div>
+</div>
+
+
+    </div>
+  </div>
+</section>
 
       <!-- Job Listings -->
       <section>
@@ -116,17 +221,43 @@
         <!-- Job Cards -->
         <div v-else class="row g-4">
           <div
-  v-for="job in [...filteredJobs].sort(
-    (a, b) => b.match_score - a.match_score
-  )"
+  v-for="job in paginatedJobs"
   :key="job.id"
   class="col-md-6 col-lg-4"
 >
   <JobCard
   :job="job"
+  :is-saved="savedJobIds.includes(job.id)"
   @save="handleSaveJob"
 />
 </div>
+
+    <!-- Pagination -->
+<div
+  v-if="totalPages > 1"
+  class="d-flex justify-content-center align-items-center gap-3 mt-4"
+>
+  <button
+    class="btn btn-outline-primary"
+    @click="previousPage"
+    :disabled="currentPage === 1"
+  >
+    ← Previous
+  </button>
+
+  <span class="fw-semibold">
+    Page {{ currentPage }} of {{ totalPages }}
+  </span>
+
+  <button
+    class="btn btn-outline-primary"
+    @click="nextPage"
+    :disabled="currentPage === totalPages"
+  >
+    Next →
+  </button>
+</div>
+
         </div>
       </section>
 
@@ -202,6 +333,12 @@
           </div>
 
           <div class="mt-auto">
+            <button
+              class="btn btn-success btn-sm me-2"
+              @click="handleMarkApplied(job)"
+            >
+              Mark as Applied
+            </button>
             <button
               class="btn btn-outline-danger btn-sm"
               @click="handleDeleteSavedJob(job.id)"
@@ -300,14 +437,68 @@
             </select>
           </div>
 
-          <div class="mt-auto">
-            <button
-              class="btn btn-outline-danger btn-sm"
-              @click="handleDeleteApplication(application.id)"
-            >
-              Delete Application
-            </button>
-          </div>
+          <!-- Application Notes -->
+<div class="mb-3">
+  <label class="form-label fw-semibold">
+    Application Notes
+  </label>
+
+  <textarea
+    v-model="application.notes"
+    class="form-control"
+    rows="4"
+    placeholder="Add interview details, assessment deadlines, recruiter information..."
+  ></textarea>
+
+  <button
+    class="btn btn-primary btn-sm mt-2"
+    @click="handleSaveNotes(application)"
+  >
+    Save Notes
+  </button>
+</div>
+
+<!-- Follow-Up Reminder -->
+<div class="mb-3">
+  <label class="form-label fw-semibold">
+    Follow-Up Reminder
+  </label>
+
+  <input
+    type="date"
+    class="form-control"
+    v-model="application.follow_up_date"
+  />
+
+  <button
+    class="btn btn-outline-primary btn-sm mt-2"
+    @click="handleSaveFollowUp(application)"
+  >
+    Save Reminder
+  </button>
+</div>
+
+<span
+  v-if="application.follow_up_date"
+  class="badge mt-2"
+  :class="{
+    'bg-danger': getReminderStatus(application.follow_up_date) === 'Overdue',
+    'bg-warning text-dark': getReminderStatus(application.follow_up_date) === 'Due Today',
+    'bg-success': getReminderStatus(application.follow_up_date) === 'Upcoming'
+  }"
+>
+  {{ getReminderStatus(application.follow_up_date) }}
+</span>
+
+<!-- Delete Application -->
+<div class="mt-auto">
+  <button
+    class="btn btn-outline-danger btn-sm"
+    @click="handleDeleteApplication(application.id)"
+  >
+    Delete Application
+  </button>
+</div>
         </div>
       </div>
     </div>
@@ -345,10 +536,28 @@ const jobs = ref([]);
 const profile = ref(null);
 const keyword = ref("");
 const location = ref("");
+const jobType = ref("");
+const sortBy = ref("match");
+const currentPage = ref(1);
+const jobsPerPage = ref(2);
 const loading = ref(false);
 const error = ref("");
 const savedJobs = ref([]);
+const savedJobIds = ref([]);
 const applications = ref([]);
+const totalApplications = computed(() => applications.value.length);
+
+const totalInterviews = computed(
+  () =>
+    applications.value.filter((app) => app.status === "Interview").length
+);
+
+const totalOffers = computed(
+  () =>
+    applications.value.filter((app) => app.status === "Offer").length
+);
+
+const totalSavedJobs = computed(() => savedJobs.value.length);
 const applicationsLoading = ref(false);
 const applicationsError = ref("");
 const savedJobsLoading = ref(false);
@@ -382,6 +591,10 @@ async function loadJobs() {
 
 async function handleSaveJob(job) {
   try {
+    if (savedJobIds.value.includes(job.id)) {
+      return;
+    }
+
     const response = await saveJob({
       job_id: job.id,
       title: job.title,
@@ -392,9 +605,12 @@ async function handleSaveJob(job) {
       match_score: job.match_score,
     });
 
+    savedJobIds.value.push(job.id);
+
     alert(response.message);
   } catch (err) {
     console.error("Error saving job:", err);
+
     alert(
       err.response?.data?.message ||
       "Unable to save this job. Please try again."
@@ -408,7 +624,14 @@ async function loadSavedJobs() {
 
   try {
     const data = await getSavedJobs();
-    savedJobs.value = Array.isArray(data) ? data : data.saved_jobs || [];
+
+    savedJobs.value = Array.isArray(data)
+      ? data
+      : data.saved_jobs || [];
+
+    savedJobIds.value = savedJobs.value.map(
+      (job) => job.job_id
+    );
   } catch (err) {
     console.error("Error loading saved jobs:", err);
     savedJobsError.value = "Unable to load saved jobs. Please try again.";
@@ -432,6 +655,37 @@ async function handleDeleteSavedJob(savedJobId) {
   } catch (err) {
     console.error("Error deleting saved job:", err);
     alert("Unable to remove this job. Please try again.");
+  }
+}
+
+async function handleMarkApplied(job) {
+  try {
+    // Prevent duplicate applications
+    const alreadyApplied = applications.value.some(
+      (app) => app.job_id === job.job_id
+    );
+
+    if (alreadyApplied) {
+      alert("You have already added this job to your applications.");
+      return;
+    }
+
+    await createApplication({
+      job_id: job.job_id,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      job_type: job.job_type,
+      apply_url: job.apply_url || "",
+      notes: "",
+    });
+
+    await loadApplications();
+
+    alert("Job added to My Applications successfully!");
+  } catch (error) {
+    console.error("Error adding application:", error);
+    alert("Failed to add this job to My Applications.");
   }
 }
 
@@ -467,6 +721,32 @@ async function handleUpdateApplication(applicationId, status) {
   } catch (err) {
     console.error("Error updating application:", err);
     alert("Unable to update application status.");
+  }
+}
+
+async function handleSaveNotes(application) {
+  try {
+    await updateApplication(application.id, {
+      notes: application.notes || "",
+    });
+
+    alert("Application notes saved successfully!");
+  } catch (error) {
+    console.error("Error saving application notes:", error);
+    alert("Failed to save application notes.");
+  }
+}
+
+async function handleSaveFollowUp(application) {
+  try {
+    await updateApplication(application.id, {
+      follow_up_date: application.follow_up_date || null,
+    });
+
+    alert("Follow-up reminder saved successfully!");
+  } catch (error) {
+    console.error("Error saving follow-up reminder:", error);
+    alert("Failed to save follow-up reminder.");
   }
 }
 
@@ -562,6 +842,7 @@ const filteredJobs = computed(() => {
   return (matchedJobs.value || []).filter((job) => {
     const searchText = keyword.value.toLowerCase().trim();
     const searchLocation = location.value.toLowerCase().trim();
+    const selectedJobType = jobType.value.toLowerCase().trim();
 
     const matchesKeyword =
       !searchText ||
@@ -575,9 +856,60 @@ const filteredJobs = computed(() => {
       !searchLocation ||
       job.location?.toLowerCase().includes(searchLocation);
 
-    return matchesKeyword && matchesLocation;
+    const matchesJobType =
+      !selectedJobType ||
+      job.job_type?.toLowerCase().includes(selectedJobType);
+
+    return matchesKeyword && matchesLocation && matchesJobType;
   });
 });
+
+const sortedJobs = computed(() => {
+  const jobsList = [...filteredJobs.value];
+
+  if (sortBy.value === "match") {
+    return jobsList.sort(
+      (a, b) => b.match_score - a.match_score
+    );
+  }
+
+  if (sortBy.value === "match-low") {
+    return jobsList.sort(
+      (a, b) => a.match_score - b.match_score
+    );
+  }
+
+  if (sortBy.value === "title") {
+    return jobsList.sort((a, b) =>
+      a.title.localeCompare(b.title)
+    );
+  }
+
+  return jobsList;
+});
+
+const totalPages = computed(() => {
+  return Math.ceil(sortedJobs.value.length / jobsPerPage.value);
+});
+
+const paginatedJobs = computed(() => {
+  const start = (currentPage.value - 1) * jobsPerPage.value;
+  const end = start + jobsPerPage.value;
+
+  return sortedJobs.value.slice(start, end);
+});
+
+function nextPage() {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++;
+  }
+}
+
+function previousPage() {
+  if (currentPage.value > 1) {
+    currentPage.value--;
+  }
+}
 
 function handleNavigate(page) {
   activePage.value = page;
@@ -591,7 +923,63 @@ function handleNavigate(page) {
   }
 }
 
+function getReminderStatus(dateString) {
+  if (!dateString) {
+    return "Not Scheduled";
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const followUpDate = new Date(`${dateString}T00:00:00`);
+
+  if (followUpDate < today) {
+    return "Overdue";
+  }
+
+  if (followUpDate.getTime() === today.getTime()) {
+    return "Due Today";
+  }
+
+  return "Upcoming";
+}
+  const overdueReminders = computed(() =>
+  applications.value.filter(
+    (app) => getReminderStatus(app.follow_up_date) === "Overdue"
+  ).length
+);
+
+const remindersDueToday = computed(() =>
+  applications.value.filter(
+    (app) => getReminderStatus(app.follow_up_date) === "Due Today"
+  ).length
+);
+
+const upcomingReminders = computed(() =>
+  applications.value.filter(
+    (app) => getReminderStatus(app.follow_up_date) === "Upcoming"
+  ).length
+);
+
+const applicationStatusCounts = computed(() => {
+  const statuses = [
+    "Applied",
+    "Assessment",
+    "Interview",
+    "Offer",
+    "Rejected",
+  ];
+
+  return statuses.map((status) => ({
+    status,
+    count: applications.value.filter(
+      (app) => app.status === status
+    ).length,
+  }));
+});
+
 onMounted(() => {
   loadJobs();
+  loadSavedJobs();
 });
 </script>

@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from datetime import date
 from models import db, Application
 
 applications_bp = Blueprint("applications", __name__)
@@ -43,6 +44,11 @@ def create_application():
         job_type=data.get("job_type"),
         status="Applied",
         notes=data.get("notes"),
+        follow_up_date=(
+           date.fromisoformat(data["follow_up_date"])
+           if data.get("follow_up_date")
+           else None
+        ),
         apply_url=data.get("apply_url"),
     )
 
@@ -76,6 +82,18 @@ def update_application(application_id):
 
     if "notes" in data:
         application.notes = data["notes"]
+
+    if "follow_up_date" in data:
+        try:
+            application.follow_up_date = (
+              date.fromisoformat(data["follow_up_date"])
+              if data["follow_up_date"]
+              else None
+            )
+        except (ValueError, TypeError):
+            return jsonify({
+               "message": "Invalid follow-up date. Use YYYY-MM-DD format."
+            }), 400
 
     db.session.commit()
 

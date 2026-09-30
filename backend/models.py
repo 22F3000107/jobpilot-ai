@@ -90,6 +90,8 @@ class Application(db.Model):
     )
 
     notes = db.Column(db.Text)
+    # Follow-up reminder date
+    follow_up_date = db.Column(db.Date)
 
     # Optional job application link
     apply_url = db.Column(db.String(500))
@@ -108,6 +110,10 @@ class Application(db.Model):
                 if self.applied_at else None
             ),
             "notes": self.notes,
-            "apply_url": self.apply_url,
+            "follow_up_date": (
+               self.follow_up_date.isoformat()
+               if self.follow_up_date else None
+            ),
+           "apply_url": self.apply_url,
         }
 

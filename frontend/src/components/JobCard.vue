@@ -1,3 +1,4 @@
+```vue
 <template>
   <div class="card job-card border-0 shadow-sm h-100">
     <div class="card-body d-flex flex-column">
@@ -40,10 +41,11 @@
         </a>
 
         <button
-          class="btn btn-outline-primary btn-sm"
+          class="btn btn-sm"
+          :class="isSaved ? 'btn-success' : 'btn-outline-primary'"
           @click="handleSave"
         >
-          Save Job
+          {{ isSaved ? "✓ Saved" : "Save Job" }}
         </button>
       </div>
     </div>
@@ -56,11 +58,20 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  isSaved: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(["save"]);
 
 function handleSave() {
+  if (props.isSaved) {
+    return;
+  }
+
   emit("save", props.job);
 }
 </script>
+```
