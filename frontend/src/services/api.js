@@ -9,8 +9,14 @@ const api = axios.create({
 
 // ==================== JOBS API ====================
 
-export const getJobs = async () => {
-  const response = await api.get("/jobs/");
+export const getJobs = async (keyword = "data analyst", location = "Bengaluru") => {
+  const response = await api.get("/jobs/", {
+    params: {
+      keyword,
+      location,
+    },
+  });
+
   return response.data;
 };
 

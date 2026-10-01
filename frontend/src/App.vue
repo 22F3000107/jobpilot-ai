@@ -226,10 +226,11 @@
   class="col-md-6 col-lg-4"
 >
   <JobCard
-  :job="job"
-  :is-saved="savedJobIds.includes(job.id)"
-  @save="handleSaveJob"
-/>
+   :job="job"
+   :is-saved="savedJobIds.includes(job.id)"
+   @save="handleSaveJob"
+   @view-details="handleViewDetails"
+  />
 </div>
 
     <!-- Pagination -->
@@ -506,6 +507,196 @@
 </main>
 
 <ProfileForm v-else-if="activePage === 'profile'" />
+
+<!-- Job Details Modal -->
+<div
+  v-if="showJobDetails && selectedJob"
+  class="modal fade show d-block"
+  tabindex="-1"
+  style="background-color: rgba(0, 0, 0, 0.55);"
+  @click.self="closeJobDetails"
+>
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <div>
+          <span class="badge bg-primary-subtle text-primary mb-2">
+            {{ selectedJob.job_type }}
+          </span>
+
+          <h3 class="modal-title fw-bold mb-1">
+            {{ selectedJob.title }}
+          </h3>
+
+          <p class="text-muted mb-0">
+            {{ selectedJob.company }}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="btn-close"
+          aria-label="Close"
+          @click="closeJobDetails"
+        ></button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="modal-body">
+
+        <!-- Job Information -->
+        <div class="row g-3 mb-4">
+
+          <div class="col-md-4">
+            <div class="bg-light rounded p-3 h-100">
+              <small class="text-muted d-block">Location</small>
+              <strong>📍 {{ selectedJob.location }}</strong>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="bg-light rounded p-3 h-100">
+              <small class="text-muted d-block">Experience</small>
+              <strong>{{ selectedJob.experience }}</strong>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="bg-light rounded p-3 h-100">
+              <small class="text-muted d-block">Your Match</small>
+              <strong class="text-success">
+                {{ selectedJob.match_score }}%
+              </strong>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Skills -->
+        <div class="mb-4">
+          <h5 class="fw-bold mb-3">Required Skills</h5>
+
+          <span
+            v-for="skill in selectedJob.skills"
+            :key="skill"
+            class="badge bg-primary-subtle text-primary me-2 mb-2 px-3 py-2"
+          >
+            {{ skill }}
+          </span>
+        </div>
+
+               <!-- Match Breakdown -->
+        <div
+          v-if="selectedJob.match_breakdown"
+          class="mb-4"
+        >
+         <h5 class="fw-bold mb-3">Match Breakdown</h5>
+
+         <div class="bg-light rounded p-3">
+
+           <div class="d-flex justify-content-between mb-2">
+             <span>Skills</span>
+
+             <span v-if="selectedJob.match_breakdown.skills.available">
+              <strong>
+               {{ selectedJob.match_breakdown.skills.score }}/50
+              </strong>
+          </span>
+
+      <span v-else class="text-muted">
+        Not enough data
+      </span>
+    </div>
+
+    <div class="d-flex justify-content-between mb-2">
+      <span>Role</span>
+      <strong>
+        {{ selectedJob.match_breakdown.role.score }}/20
+      </strong>
+    </div>
+
+    <div class="d-flex justify-content-between mb-2">
+      <span>Location</span>
+      <strong>
+        {{ selectedJob.match_breakdown.location.score }}/15
+      </strong>
+    </div>
+
+    <div class="d-flex justify-content-between">
+      <span>Experience</span>
+      <strong>
+        {{ selectedJob.match_breakdown.experience.score }}/15
+      </strong>
+    </div>
+
+  </div>
+</div>
+
+        <!-- Match Information -->
+        <div class="alert alert-info border-0">
+          <strong>Why this job matches you</strong>
+          <p class="mb-0 mt-1">
+            This opportunity has been matched against your profile based on
+            your skills, preferred role, and preferred location.
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="modal-footer">
+
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          @click="closeJobDetails"
+        >
+          Close
+        </button>
+
+        <button
+          type="button"
+          class="btn"
+          :class="
+            savedJobIds.includes(selectedJob.id)
+              ? 'btn-success'
+              : 'btn-outline-primary'
+          "
+          @click="handleSaveJob(selectedJob)"
+        >
+          {{
+            savedJobIds.includes(selectedJob.id)
+              ? "✓ Saved"
+              : "Save Job"
+          }}
+        </button>
+
+        <button
+          type="button"
+          class="btn btn-outline-success"
+          @click="handleMarkApplied(selectedJob)"
+        >
+          Mark as Applied
+        </button>
+
+        <a
+          :href="selectedJob.apply_url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn btn-primary"
+        >
+          Apply Now ↗
+        </a>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
   </div>
 </template>
 
@@ -544,6 +735,8 @@ const loading = ref(false);
 const error = ref("");
 const savedJobs = ref([]);
 const savedJobIds = ref([]);
+const selectedJob = ref(null);
+const showJobDetails = ref(false);
 const applications = ref([]);
 const totalApplications = computed(() => applications.value.length);
 
@@ -660,9 +853,11 @@ async function handleDeleteSavedJob(savedJobId) {
 
 async function handleMarkApplied(job) {
   try {
+    const jobId = job.job_id ?? job.id;
+
     // Prevent duplicate applications
     const alreadyApplied = applications.value.some(
-      (app) => app.job_id === job.job_id
+      (app) => app.job_id === jobId
     );
 
     if (alreadyApplied) {
@@ -671,7 +866,7 @@ async function handleMarkApplied(job) {
     }
 
     await createApplication({
-      job_id: job.job_id,
+      job_id: jobId,
       title: job.title,
       company: job.company,
       location: job.location,
@@ -683,6 +878,8 @@ async function handleMarkApplied(job) {
     await loadApplications();
 
     alert("Job added to My Applications successfully!");
+
+    closeJobDetails();
   } catch (error) {
     console.error("Error adding application:", error);
     alert("Failed to add this job to My Applications.");
@@ -776,26 +973,117 @@ function normalize(value) {
     .trim();
 }
 
+function normalizeLocation(value) {
+  return normalize(value)
+    .replace(/\bbangalore\b/g, "bengaluru");
+}
+
+
+
+function normalizeSkill(skill) {
+  const value = normalize(skill);
+
+  const aliases = {
+    "ml": "machine learning",
+    "machine learning": "machine learning",
+
+    "ai": "artificial intelligence",
+    "artificial intelligence": "artificial intelligence",
+
+    "genai": "generative ai",
+    "generative ai": "generative ai",
+
+    "rest api": "rest api",
+    "rest apis": "rest api",
+
+    "sklearn": "scikit-learn",
+    "scikit learn": "scikit-learn",
+    "scikit-learn": "scikit-learn",
+
+    "powerbi": "power bi",
+    "power bi": "power bi",
+
+    "js": "javascript",
+    "javascript": "javascript",
+
+    "ts": "typescript",
+    "typescript": "typescript",
+
+    "postgres": "postgresql",
+    "postgresql": "postgresql",
+
+    "mongo": "mongodb",
+    "mongodb": "mongodb",
+  };
+
+  return aliases[value] || value;
+}
+
 function calculateMatchScore(job, userProfile) {
   if (!userProfile) {
-    return 0;
+    return {
+      score: 0,
+      breakdown: null,
+    };
   }
 
   let score = 0;
 
-  // 1. Skills Match (60%)
-  const userSkills = (userProfile.skills || []).map(normalize);
-  const jobSkills = (job.skills || []).map(normalize);
+  // Match breakdown
+  const breakdown = {
+    skills: {
+      score: 0,
+      max: 50,
+      matched: [],
+      unmatched: [],
+      available: false,
+    },
+    role: {
+      score: 0,
+      max: 20,
+      matched: false,
+    },
+    location: {
+      score: 0,
+      max: 15,
+      matched: false,
+    },
+    experience: {
+      score: 0,
+      max: 15,
+      matched: false,
+    },
+  };
 
-  if (jobSkills.length > 0) {
-    const matchingSkills = jobSkills.filter((skill) =>
-      userSkills.includes(skill)
-    );
+  // 1. Skills Match (50%)
+  const userSkills = (userProfile.skills || []).map(normalizeSkill);
 
-    score += (matchingSkills.length / jobSkills.length) * 60;
-  }
+const jobSkills = (job.skills || []).map(normalizeSkill);
 
-  // 2. Preferred Role Match (25%)
+if (jobSkills.length > 0) {
+  breakdown.skills.available = true;
+
+  const matchingSkills = jobSkills.filter((skill) =>
+  userSkills.includes(skill)
+);
+
+const unmatchedSkills = jobSkills.filter(
+  (skill) => !userSkills.includes(skill)
+);
+
+const skillScore =
+  (matchingSkills.length / jobSkills.length) * 50;
+
+score += skillScore;
+
+breakdown.skills.score = Math.round(skillScore);
+
+breakdown.skills.matched = matchingSkills;
+
+breakdown.skills.unmatched = unmatchedSkills;
+}
+
+  // 2. Preferred Role Match (20%)
   const preferredRoles = (
     userProfile.preferred_roles || []
   ).map(normalize);
@@ -809,15 +1097,17 @@ function calculateMatchScore(job, userProfile) {
   );
 
   if (roleMatches) {
-    score += 25;
+    score += 20;
+    breakdown.role.score = 20;
+    breakdown.role.matched = true;
   }
 
   // 3. Location Match (15%)
   const preferredLocations = (
     userProfile.preferred_locations || []
-  ).map(normalize);
+  ).map(normalizeLocation);
 
-  const jobLocation = normalize(job.location);
+  const jobLocation = normalizeLocation(job.location);
 
   const locationMatches = preferredLocations.some(
     (location) =>
@@ -827,15 +1117,65 @@ function calculateMatchScore(job, userProfile) {
 
   if (locationMatches) {
     score += 15;
+    breakdown.location.score = 15;
+    breakdown.location.matched = true;
   }
 
-  return Math.round(score);
+  // 4. Experience Match (15%)
+  const profileExperience = normalize(
+    userProfile.experience || "fresher"
+  );
+
+  const jobExperience = normalize(
+    job.experience || "not specified"
+  );
+
+  if (profileExperience === "fresher") {
+    if (
+      jobExperience === "fresher" ||
+      jobExperience === "not specified"
+    ) {
+      score += 15;
+      breakdown.experience.score = 15;
+      breakdown.experience.matched = true;
+    } else {
+      const experienceMatch = jobExperience.match(
+        /(\d+(?:\.\d+)?)/
+      );
+
+      if (experienceMatch) {
+        const minimumExperience = parseFloat(
+          experienceMatch[1]
+        );
+
+        if (minimumExperience <= 1) {
+          score += 15;
+          breakdown.experience.score = 15;
+          breakdown.experience.matched = true;
+        }
+      }
+    }
+  }
+
+  return {
+    score: Math.round(score),
+    breakdown,
+  };
 }
+
 const matchedJobs = computed(() => {
-  return jobs.value.map((job) => ({
-    ...job,
-    match_score: calculateMatchScore(job, profile.value),
-  }));
+  return jobs.value.map((job) => {
+    const match = calculateMatchScore(
+      job,
+      profile.value
+    );
+
+    return {
+      ...job,
+      match_score: match.score,
+      match_breakdown: match.breakdown,
+    };
+  });
 });
 
 const filteredJobs = computed(() => {
@@ -977,6 +1317,17 @@ const applicationStatusCounts = computed(() => {
     ).length,
   }));
 });
+
+
+function handleViewDetails(job) {
+  selectedJob.value = job;
+  showJobDetails.value = true;
+}
+
+function closeJobDetails() {
+  showJobDetails.value = false;
+  selectedJob.value = null;
+}
 
 onMounted(() => {
   loadJobs();
