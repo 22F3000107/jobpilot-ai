@@ -320,7 +320,11 @@ def fetch_adzuna_jobs(keyword="", location=""):
             print("COMPANY:", company.get("display_name", "Unknown Company"))
             print("DESCRIPTION:")
             print(description)
+            print("LOWER DESCRIPTION:")
+            print(description.lower())
             print("==============================\n")
+            skills = extract_skills(f"{title} {description}")
+            print("EXTRACTED SKILLS:", skills)
 
             normalized_jobs.append({
                "id": f"adzuna-{job.get('id')}",
@@ -335,11 +339,14 @@ def fetch_adzuna_jobs(keyword="", location=""):
                 ),
                 "job_type": normalize_contract_type(job),
                 "experience": extract_experience(description),
-                "skills": extract_skills(f"{title} {description}"),
+                "skills": skills,
                 "match_score": 0,
                 "apply_url": job.get("redirect_url", ""),
                 "description": job.get("description", ""),
                 "source": "Adzuna",
+                "created": job.get("created"),
+                "salary_min": job.get("salary_min"),
+                "salary_max": job.get("salary_max"),
             })
 
         return normalized_jobs

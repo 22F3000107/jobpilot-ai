@@ -80,8 +80,32 @@
 
       <p class="text-muted mb-2">{{ job.company }}</p>
 
-      <p class="text-muted small mb-3">
-        📍 {{ job.location }} · {{ job.experience }}
+      <p class="text-muted small mb-1">
+         📍 {{ job.location }} · {{ job.experience }}
+      </p>
+       <p
+  v-if="job.salary_min || job.salary_max"
+  class="text-muted small mb-1"
+>
+  💰
+  <span v-if="job.salary_min && job.salary_max">
+    ₹{{ Math.round(job.salary_min).toLocaleString() }}
+    – ₹{{ Math.round(job.salary_max).toLocaleString() }}
+  </span>
+
+  <span v-else-if="job.salary_min">
+    From ₹{{ Math.round(job.salary_min).toLocaleString() }}
+  </span>
+
+  <span v-else>
+    Up to ₹{{ Math.round(job.salary_max).toLocaleString() }}
+  </span>
+</p>
+      <p
+         v-if="job.created"
+         class="text-muted small mb-3"
+      >
+         🕐 {{ getPostedLabel(job.created) }}
       </p>
 
       <div class="mb-3">
@@ -115,6 +139,31 @@
 </template>
 
 <script setup>
+
+function getPostedLabel(created) {
+  if (!created) {
+    return "";
+  }
+
+  const postedDate = new Date(created);
+  const now = new Date();
+
+  const diffMs = now - postedDate;
+  const diffDays = Math.floor(
+    diffMs / (1000 * 60 * 60 * 24)
+  );
+
+  if (diffDays <= 0) {
+    return "Posted today";
+  }
+
+  if (diffDays === 1) {
+    return "Posted 1 day ago";
+  }
+
+  return `Posted ${diffDays} days ago`;
+}
+
 const props = defineProps({
   job: {
     type: Object,

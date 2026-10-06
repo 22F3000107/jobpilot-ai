@@ -159,6 +159,8 @@
           <option value="">All Job Types</option>
           <option value="Internship">Internship</option>
           <option value="Full-time">Full-time</option>
+          <option value="Part-time">Part-time</option>
+          <option value="Contract">Contract</option>
           <option value="Fresher">Fresher</option>
         </select>
       </div>
@@ -172,17 +174,48 @@
           Search
         </button>
       </div>
-     
-      <div class="row mt-3">
+       
+<div class="row mt-3">
+  <!-- Sort Jobs By -->
   <div class="col-md-4">
     <label class="form-label fw-semibold">Sort Jobs By</label>
     <select v-model="sortBy" class="form-select">
       <option value="match">Highest Match</option>
       <option value="match-low">Lowest Match</option>
       <option value="title">Job Title (A–Z)</option>
+      <option value="newest">Newest</option>
+    </select>
+  </div>
+
+  <!-- Minimum Match -->
+  <div class="col-md-3">
+    <label class="form-label fw-semibold">Minimum Match</label>
+    <select v-model="minMatch" class="form-select">
+      <option :value="0">All Matches</option>
+      <option :value="50">50%+</option>
+      <option :value="60">60%+</option>
+      <option :value="70">70%+</option>
+      <option :value="80">80%+</option>
     </select>
   </div>
 </div>
+
+      <!-- Remote Jobs Only -->
+<div class="col-md-3 d-flex align-items-end">
+  <div class="form-check mb-2">
+    <input
+      id="remoteOnly"
+      v-model="remoteOnly"
+      class="form-check-input"
+      type="checkbox"
+    />
+    <label class="form-check-label" for="remoteOnly">
+      Remote jobs only
+    </label>
+  </div>
+</div>
+
+
 
 
     </div>
@@ -586,6 +619,19 @@
             {{ skill }}
           </span>
         </div>
+        
+       
+        <!-- Experience Warning -->
+        <div
+          v-if="getExperienceWarning(selectedJob)"
+          class="alert alert-warning mt-3"
+        >
+          <strong>⚠️ Experience mismatch</strong>
+          <p class="mb-0 mt-1">
+           {{ getExperienceWarning(selectedJob) }}
+          </p>
+        </div>
+
 
                <!-- Match Breakdown -->
         <div
@@ -596,19 +642,62 @@
 
          <div class="bg-light rounded p-3">
 
-           <div class="d-flex justify-content-between mb-2">
-             <span>Skills</span>
+              <!-- Skills Score -->
+<div class="d-flex justify-content-between mb-2">
+  <span>Skills</span>
 
-             <span v-if="selectedJob.match_breakdown.skills.available">
-              <strong>
-               {{ selectedJob.match_breakdown.skills.score }}/50
-              </strong>
-          </span>
+  <span v-if="selectedJob.match_breakdown.skills.available">
+    <strong>
+      {{ selectedJob.match_breakdown.skills.score }}/50
+    </strong>
+  </span>
 
-      <span v-else class="text-muted">
-        Not enough data
-      </span>
-    </div>
+  <span v-else class="text-muted">
+    Not enough data
+  </span>
+</div>
+
+<!-- Matched Skills -->
+<div
+  v-if="
+    selectedJob.match_breakdown.skills.matched &&
+    selectedJob.match_breakdown.skills.matched.length > 0
+  "
+  class="mt-3"
+>
+   <small class="text-success fw-bold d-block mb-2">
+     ✓ Matched Skills
+   </small>
+
+  <span
+    v-for="skill in selectedJob.match_breakdown.skills.matched"
+    :key="`matched-${skill}`"
+    class="badge bg-success-subtle text-success me-2 mb-2 px-3 py-2"
+  >
+    {{ skill }}
+  </span>
+</div>
+
+<!-- Missing Skills -->
+<div
+  v-if="
+    selectedJob.match_breakdown.skills.unmatched &&
+    selectedJob.match_breakdown.skills.unmatched.length > 0
+  "
+  class="mt-2"
+>
+  <small class="text-danger fw-bold d-block mb-2">
+    ⚠ Skills to Improve
+  </small>
+
+  <span
+    v-for="skill in selectedJob.match_breakdown.skills.unmatched"
+    :key="`missing-${skill}`"
+    class="badge bg-danger-subtle text-danger me-2 mb-2 px-3 py-2"
+  >
+    {{ skill }}
+  </span>
+</div>
 
     <div class="d-flex justify-content-between mb-2">
       <span>Role</span>
@@ -701,7 +790,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 
 import Navbar from "./components/Navbar.vue";
 import StatsCard from "./components/StatsCard.vue";
@@ -711,7 +800,7 @@ import ProfileForm from "./components/ProfileForm.vue";
 
 import {
   getJobs,
-  getProfile,
+  getProfile, 
   saveJob,
   getSavedJobs,
   deleteSavedJob,
@@ -728,9 +817,11 @@ const profile = ref(null);
 const keyword = ref("");
 const location = ref("");
 const jobType = ref("");
+const remoteOnly = ref(false);
 const sortBy = ref("match");
+const minMatch = ref(0);
 const currentPage = ref(1);
-const jobsPerPage = ref(2);
+const jobsPerPage = ref(5);
 const loading = ref(false);
 const error = ref("");
 const savedJobs = ref([]);
@@ -980,10 +1071,12 @@ function normalizeLocation(value) {
 
 
 
+
 function normalizeSkill(skill) {
   const value = normalize(skill);
 
   const aliases = {
+    // Machine Learning / AI
     "ml": "machine learning",
     "machine learning": "machine learning",
 
@@ -993,31 +1086,61 @@ function normalizeSkill(skill) {
     "genai": "generative ai",
     "generative ai": "generative ai",
 
+    // APIs
     "rest api": "rest api",
     "rest apis": "rest api",
+    "restful api": "rest api",
+    "restful apis": "rest api",
 
-    "sklearn": "scikit-learn",
+    // Python / Data Science
+    "python": "python",
+    "pandas": "pandas",
+    "numpy": "numpy",
     "scikit learn": "scikit-learn",
     "scikit-learn": "scikit-learn",
+    "sklearn": "scikit-learn",
 
+    // Databases
+    "postgres": "postgresql",
+    "postgresql": "postgresql",
+
+    "mongo": "mongodb",
+    "mongodb": "mongodb",
+
+    "sql": "sql",
+
+    // BI / Analytics
     "powerbi": "power bi",
     "power bi": "power bi",
 
+    // Programming languages
     "js": "javascript",
     "javascript": "javascript",
 
     "ts": "typescript",
     "typescript": "typescript",
 
-    "postgres": "postgresql",
-    "postgresql": "postgresql",
+    // Cloud / Data platforms
+    "gcp": "google cloud",
+    "google cloud": "google cloud",
 
-    "mongo": "mongodb",
-    "mongodb": "mongodb",
+    "aws": "aws",
+    "amazon web services": "aws",
+
+    "azure": "azure",
+
+    "bigquery": "bigquery",
+    "big query": "bigquery",
+
+    // Version control
+    "git": "git",
+    "github": "github",
   };
 
   return aliases[value] || value;
 }
+
+
 
 function calculateMatchScore(job, userProfile) {
   if (!userProfile) {
@@ -1056,7 +1179,7 @@ function calculateMatchScore(job, userProfile) {
   };
 
   // 1. Skills Match (50%)
-  const userSkills = (userProfile.skills || []).map(normalizeSkill);
+const userSkills = (userProfile.skills || []).map(normalizeSkill);
 
 const jobSkills = (job.skills || []).map(normalizeSkill);
 
@@ -1121,47 +1244,94 @@ breakdown.skills.unmatched = unmatchedSkills;
     breakdown.location.matched = true;
   }
 
-  // 4. Experience Match (15%)
-  const profileExperience = normalize(
-    userProfile.experience || "fresher"
-  );
+  
+// 4. Experience Match (15%)
+const profileExperience = normalize(
+  userProfile.experience || "fresher"
+);
 
-  const jobExperience = normalize(
-    job.experience || "not specified"
-  );
+const jobExperience = normalize(
+  job.experience || "not specified"
+);
 
-  if (profileExperience === "fresher") {
-    if (
-      jobExperience === "fresher" ||
-      jobExperience === "not specified"
-    ) {
-      score += 15;
-      breakdown.experience.score = 15;
-      breakdown.experience.matched = true;
-    } else {
-      const experienceMatch = jobExperience.match(
-        /(\d+(?:\.\d+)?)/
+if (profileExperience === "fresher") {
+  if (jobExperience === "fresher") {
+    // Explicitly suitable for freshers
+    score += 15;
+    breakdown.experience.score = 15;
+    breakdown.experience.matched = true;
+  } else if (jobExperience === "not specified") {
+    // Unknown requirement: do not assume compatibility
+    breakdown.experience.score = 0;
+    breakdown.experience.matched = false;
+  } else {
+    // Extract the stated experience requirement
+    const experienceMatch = jobExperience.match(
+      /(\d+(?:\.\d+)?)/
+    );
+
+    if (experienceMatch) {
+      const minimumExperience = parseFloat(
+        experienceMatch[1]
       );
 
-      if (experienceMatch) {
-        const minimumExperience = parseFloat(
-          experienceMatch[1]
-        );
-
-        if (minimumExperience <= 1) {
-          score += 15;
-          breakdown.experience.score = 15;
-          breakdown.experience.matched = true;
-        }
+      if (minimumExperience <= 1) {
+        // Suitable for entry-level candidates
+        score += 15;
+        breakdown.experience.score = 15;
+        breakdown.experience.matched = true;
       }
     }
   }
-
-  return {
-    score: Math.round(score),
-    breakdown,
-  };
 }
+
+return {
+  score: Math.round(score),
+  breakdown,
+};
+}
+
+
+function getExperienceWarning(job) {
+  if (!job?.experience) {
+    return "";
+  }
+
+  const jobExperience = normalize(job.experience);
+
+  if (
+    jobExperience === "not specified" ||
+    jobExperience === "fresher"
+  ) {
+    return "";
+  }
+
+  const experienceMatch = jobExperience.match(
+    /(\d+(?:\.\d+)?)/
+  );
+
+  if (!experienceMatch) {
+    return "";
+  }
+
+  const minimumExperience = parseFloat(experienceMatch[1]);
+
+  const profileExperience = normalize(
+    profile.value?.experience || "fresher"
+  );
+
+  if (
+    profileExperience === "fresher" &&
+    minimumExperience > 1
+  ) {
+    return `This job requires ${job.experience} of experience, while your profile is set to Fresher.`;
+  }
+
+  return "";
+}
+
+
+
 
 const matchedJobs = computed(() => {
   return jobs.value.map((job) => {
@@ -1200,32 +1370,67 @@ const filteredJobs = computed(() => {
       !selectedJobType ||
       job.job_type?.toLowerCase().includes(selectedJobType);
 
-    return matchesKeyword && matchesLocation && matchesJobType;
+    const matchesRemote =
+      !remoteOnly.value ||
+      /remote|work from home|work-from-home|wfh/i.test(
+        `${job.location || ""} ${job.job_type || ""} ${job.title || ""}`
+      );
+
+    const matchesMinMatch =
+       job.match_score >= minMatch.value;
+
+    return matchesKeyword && matchesLocation && matchesJobType && matchesMinMatch && matchesRemote;
   });
 });
 
+watch(
+  [keyword, location, jobType, minMatch, remoteOnly, sortBy],
+  () => {
+    currentPage.value = 1;
+  }
+);
+
 const sortedJobs = computed(() => {
+
   const jobsList = [...filteredJobs.value];
 
   if (sortBy.value === "match") {
+
     return jobsList.sort(
       (a, b) => b.match_score - a.match_score
     );
+
   }
 
   if (sortBy.value === "match-low") {
+
     return jobsList.sort(
       (a, b) => a.match_score - b.match_score
     );
+
   }
 
   if (sortBy.value === "title") {
+
     return jobsList.sort((a, b) =>
       a.title.localeCompare(b.title)
     );
+
+  }
+
+  if (sortBy.value === "newest") {
+
+    return jobsList.sort((a, b) => {
+      const dateA = new Date(a.created || 0);
+      const dateB = new Date(b.created || 0);
+
+      return dateB - dateA;
+    });
+
   }
 
   return jobsList;
+
 });
 
 const totalPages = computed(() => {
