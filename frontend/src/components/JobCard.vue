@@ -1,4 +1,4 @@
-```vue
+
 <template>
   <div class="card job-card border-0 shadow-sm h-100">
     <div class="card-body d-flex flex-column">
@@ -6,6 +6,49 @@
         <span class="badge bg-primary-subtle text-primary">
           {{ job.job_type }}
         </span>
+
+          <span
+  v-if="applicationStatus"
+  class="badge ms-1"
+  :class="{
+    'bg-primary-subtle text-primary': applicationStatus === 'Applied',
+    'bg-warning-subtle text-warning-emphasis': applicationStatus === 'Assessment',
+    'bg-info-subtle text-info-emphasis': applicationStatus === 'Interview',
+    'bg-success-subtle text-success': applicationStatus === 'Offer',
+    'bg-danger-subtle text-danger': applicationStatus === 'Rejected'
+  }"
+>
+  {{
+    applicationStatus === "Applied"
+      ? "📌 Applied"
+      : applicationStatus === "Assessment"
+        ? "📝 Assessment"
+        : applicationStatus === "Interview"
+          ? "🎯 Interview"
+          : applicationStatus === "Offer"
+            ? "🎉 Offer"
+            : "❌ Rejected"
+  }}
+</span>
+
+
+        <span
+  v-if="job.priority"
+  class="badge ms-1"
+  :class="{
+    'bg-success-subtle text-success': job.priority === 'high',
+    'bg-warning-subtle text-warning-emphasis': job.priority === 'medium',
+    'bg-danger-subtle text-danger': job.priority === 'low'
+  }"
+>
+  {{
+    job.priority === "high"
+      ? "🟢 High Priority"
+      : job.priority === "medium"
+        ? "🟡 Medium Priority"
+        : "🔴 Low Priority"
+  }}
+</span>
 
         <span class="badge bg-success-subtle text-success">
           {{ job.match_score }}% Match
@@ -88,25 +131,33 @@
   class="text-muted small mb-1"
 >
   💰
-  <span v-if="job.salary_min && job.salary_max">
-    ₹{{ Math.round(job.salary_min).toLocaleString() }}
-    – ₹{{ Math.round(job.salary_max).toLocaleString() }}
-  </span>
+   <span v-if="job.salary_min && job.salary_max">
+  {{ formatSalary(job.salary_min) }}
+  – {{ formatSalary(job.salary_max) }}
+</span>
 
-  <span v-else-if="job.salary_min">
-    From ₹{{ Math.round(job.salary_min).toLocaleString() }}
-  </span>
+<span v-else-if="job.salary_min">
+  From {{ formatSalary(job.salary_min) }}
+</span>
 
-  <span v-else>
-    Up to ₹{{ Math.round(job.salary_max).toLocaleString() }}
-  </span>
+<span v-else>
+  Up to {{ formatSalary(job.salary_max) }}
+</span>
 </p>
-      <p
-         v-if="job.created"
-         class="text-muted small mb-3"
-      >
-         🕐 {{ getPostedLabel(job.created) }}
-      </p>
+        <div v-if="job.created" class="mb-3">
+
+  <span
+    v-if="isFreshJob(job.created)"
+    class="badge bg-warning-subtle text-warning-emphasis me-2"
+  >
+    🔥 Fresh
+  </span>
+
+  <span class="text-muted small">
+    🕐 {{ getPostedLabel(job.created) }}
+  </span>
+
+</div>
 
       <div class="mb-3">
         <span
@@ -164,6 +215,22 @@ function getPostedLabel(created) {
   return `Posted ${diffDays} days ago`;
 }
 
+function isFreshJob(created) {
+  if (!created) {
+    return false;
+  }
+
+  const postedDate = new Date(created);
+  const now = new Date();
+
+  const diffMs = now - postedDate;
+  const diffDays = Math.floor(
+    diffMs / (1000 * 60 * 60 * 24)
+  );
+
+  return diffDays <= 3;
+}
+
 const props = defineProps({
   job: {
     type: Object,
@@ -172,6 +239,10 @@ const props = defineProps({
   isSaved: {
     type: Boolean,
     default: false,
+  },
+  applicationStatus: {
+    type: String,
+    default: "",
   },
 });
 
@@ -188,5 +259,18 @@ function handleSave() {
 function handleViewDetails() {
   emit("view-details", props.job);
 }
+function formatSalary(amount) {
+  if (!amount) {
+    return "";
+  }
+
+  const lakh = amount / 100000;
+
+  if (lakh >= 1) {
+    return `₹${lakh % 1 === 0 ? lakh : lakh.toFixed(1)}L`;
+  }
+
+  return `₹${Math.round(amount).toLocaleString("en-IN")}`;
+}
 </script>
-```
+

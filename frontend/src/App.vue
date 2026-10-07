@@ -200,6 +200,20 @@
   </div>
 </div>
 
+<div class="col-md-3">
+  <label class="form-label">Job Age</label>
+
+  <select
+    v-model="jobAge"
+    class="form-select"
+  >
+    <option value="all">All Jobs</option>
+    <option value="3">Last 3 days</option>
+    <option value="7">Last 7 days</option>
+    <option value="30">Last 30 days</option>
+  </select>
+</div>
+
       <!-- Remote Jobs Only -->
 <div class="col-md-3 d-flex align-items-end">
   <div class="form-check mb-2">
@@ -261,6 +275,7 @@
   <JobCard
    :job="job"
    :is-saved="savedJobIds.includes(job.id)"
+   :application-status="getApplicationStatus(job.id)"
    @save="handleSaveJob"
    @view-details="handleViewDetails"
   />
@@ -820,6 +835,7 @@ const jobType = ref("");
 const remoteOnly = ref(false);
 const sortBy = ref("match");
 const minMatch = ref(0);
+const jobAge = ref("all");
 const currentPage = ref(1);
 const jobsPerPage = ref(5);
 const loading = ref(false);
@@ -1057,6 +1073,15 @@ async function handleDeleteApplication(applicationId) {
   }
 }
 
+function getApplicationStatus(jobId) {
+  const application = applications.value.find(
+    (app) => app.job_id === jobId
+  );
+
+  return application?.status || "";
+}
+
+
 function normalize(value) {
   return String(value || "")
     .toLowerCase()
@@ -1292,6 +1317,66 @@ return {
 }
 
 
+function getJobPriority(job) {
+  const score = job.match_score || 0;
+
+  const experienceScore =
+    job.match_breakdown?.experience?.score || 0;
+
+  const jobExperience = normalize(
+    job.experience || "not specified"
+  );
+
+  const hasExperienceMismatch =
+    normalize(profile.value?.experience || "fresher") === "fresher" &&
+    jobExperience !== "fresher" &&
+    jobExperience !== "not specified" &&
+    experienceScore === 0;
+
+  const jobAgeDays = job.created
+    ? (new Date() - new Date(job.created)) /
+      (1000 * 60 * 60 * 24)
+    : null;
+
+  const isFresh =
+    jobAgeDays !== null &&
+    jobAgeDays <= 3;
+
+  const isRecent =
+    jobAgeDays !== null &&
+    jobAgeDays <= 7;
+
+  // High Priority
+  if (
+    score >= 70 &&
+    isFresh &&
+    !hasExperienceMismatch
+  ) {
+    return {
+      level: "high",
+      label: "High Priority",
+    };
+  }
+
+  // Medium Priority
+  if (
+    score >= 55 &&
+    isRecent &&
+    !hasExperienceMismatch
+  ) {
+    return {
+      level: "medium",
+      label: "Medium Priority",
+    };
+  }
+
+  // Low Priority
+  return {
+    level: "low",
+    label: "Low Priority",
+  };
+}
+
 function getExperienceWarning(job) {
   if (!job?.experience) {
     return "";
@@ -1340,10 +1425,18 @@ const matchedJobs = computed(() => {
       profile.value
     );
 
-    return {
+    const jobWithMatch = {
       ...job,
       match_score: match.score,
       match_breakdown: match.breakdown,
+    };
+
+    const priority = getJobPriority(jobWithMatch);
+
+    return {
+      ...jobWithMatch,
+      priority: priority.level,
+      priority_label: priority.label,
     };
   });
 });
@@ -1379,12 +1472,20 @@ const filteredJobs = computed(() => {
     const matchesMinMatch =
        job.match_score >= minMatch.value;
 
-    return matchesKeyword && matchesLocation && matchesJobType && matchesMinMatch && matchesRemote;
+    const matchesJobAge =
+       jobAge.value === "all" ||
+       !job.created ||
+      (
+         (new Date() - new Date(job.created)) /
+         (1000 * 60 * 60 * 24)
+      ) <= Number(jobAge.value);
+
+    return matchesKeyword && matchesLocation && matchesJobType && matchesMinMatch && matchesRemote && matchesJobAge;
   });
 });
 
 watch(
-  [keyword, location, jobType, minMatch, remoteOnly, sortBy],
+  [keyword, location, jobType, minMatch, remoteOnly, sortBy , jobAge],
   () => {
     currentPage.value = 1;
   }
