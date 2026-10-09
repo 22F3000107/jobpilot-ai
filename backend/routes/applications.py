@@ -36,6 +36,20 @@ def create_application():
                 "message": f"{field} is required"
             }), 400
 
+      
+    # Prevent duplicate applications for the same job
+    existing_application = Application.query.filter_by(
+        job_id=data["job_id"]
+    ).first()
+
+    if existing_application:
+        return jsonify({
+            "message": "This job is already in your applications.",
+            "application": existing_application.to_dict(),
+        }), 409
+        
+
+    
     application = Application(
         job_id=data["job_id"],
         title=data["title"],

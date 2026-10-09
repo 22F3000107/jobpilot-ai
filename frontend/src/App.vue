@@ -1073,9 +1073,10 @@ async function handleDeleteApplication(applicationId) {
   }
 }
 
+
 function getApplicationStatus(jobId) {
   const application = applications.value.find(
-    (app) => app.job_id === jobId
+    (app) => String(app.job_id) === String(jobId)
   );
 
   return application?.status || "";
@@ -1097,17 +1098,19 @@ function normalizeLocation(value) {
 
 
 
+
 function normalizeSkill(skill) {
-  const value = normalize(skill);
+  const value = normalize(String(skill || ""))
+    .replace(/[._-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
   const aliases = {
     // Machine Learning / AI
     "ml": "machine learning",
     "machine learning": "machine learning",
-
     "ai": "artificial intelligence",
     "artificial intelligence": "artificial intelligence",
-
     "genai": "generative ai",
     "generative ai": "generative ai",
 
@@ -1122,16 +1125,14 @@ function normalizeSkill(skill) {
     "pandas": "pandas",
     "numpy": "numpy",
     "scikit learn": "scikit-learn",
-    "scikit-learn": "scikit-learn",
     "sklearn": "scikit-learn",
+    "scikit-learn": "scikit-learn",
 
     // Databases
     "postgres": "postgresql",
     "postgresql": "postgresql",
-
     "mongo": "mongodb",
     "mongodb": "mongodb",
-
     "sql": "sql",
 
     // BI / Analytics
@@ -1141,19 +1142,18 @@ function normalizeSkill(skill) {
     // Programming languages
     "js": "javascript",
     "javascript": "javascript",
-
+    "nodejs": "node.js",
+    "node js": "node.js",
+    "node.js": "node.js",
     "ts": "typescript",
     "typescript": "typescript",
 
     // Cloud / Data platforms
     "gcp": "google cloud",
     "google cloud": "google cloud",
-
     "aws": "aws",
     "amazon web services": "aws",
-
     "azure": "azure",
-
     "bigquery": "bigquery",
     "big query": "bigquery",
 
@@ -1204,31 +1204,33 @@ function calculateMatchScore(job, userProfile) {
   };
 
   // 1. Skills Match (50%)
-const userSkills = (userProfile.skills || []).map(normalizeSkill);
 
-const jobSkills = (job.skills || []).map(normalizeSkill);
+const userSkills = [
+  ...new Set((userProfile.skills || []).map(normalizeSkill)),
+];
 
-if (jobSkills.length > 0) {
+const jobSkills = [
+  ...new Set((job.skills || []).map(normalizeSkill)),
+];
+
+if (jobSkills.length > 0 && userSkills.length > 0) {
   breakdown.skills.available = true;
 
   const matchingSkills = jobSkills.filter((skill) =>
-  userSkills.includes(skill)
-);
+    userSkills.includes(skill)
+  );
 
-const unmatchedSkills = jobSkills.filter(
-  (skill) => !userSkills.includes(skill)
-);
+  const unmatchedSkills = jobSkills.filter(
+    (skill) => !userSkills.includes(skill)
+  );
 
-const skillScore =
-  (matchingSkills.length / jobSkills.length) * 50;
+  const skillScore =
+    (matchingSkills.length / jobSkills.length) * 50;
 
-score += skillScore;
-
-breakdown.skills.score = Math.round(skillScore);
-
-breakdown.skills.matched = matchingSkills;
-
-breakdown.skills.unmatched = unmatchedSkills;
+  score += skillScore;
+  breakdown.skills.score = Math.round(skillScore);
+  breakdown.skills.matched = matchingSkills;
+  breakdown.skills.unmatched = unmatchedSkills;
 }
 
   // 2. Preferred Role Match (20%)
@@ -1250,6 +1252,7 @@ breakdown.skills.unmatched = unmatchedSkills;
     breakdown.role.matched = true;
   }
 
+  
   // 3. Location Match (15%)
   const preferredLocations = (
     userProfile.preferred_locations || []
@@ -1257,11 +1260,22 @@ breakdown.skills.unmatched = unmatchedSkills;
 
   const jobLocation = normalizeLocation(job.location);
 
-  const locationMatches = preferredLocations.some(
-    (location) =>
-      location &&
-      jobLocation.includes(location)
-  );
+  const isRemoteJob =
+    job.remote === true ||
+    /\b(remote|work from home|wfh)\b/i.test(
+      `${job.location || ""} ${job.title || ""} ${job.description || ""}`
+    );
+
+  const locationMatches =
+    isRemoteJob ||
+    preferredLocations.some(
+      (location) =>
+        location &&
+        (
+          jobLocation.includes(location) ||
+          location.includes(jobLocation)
+        )
+    );
 
   if (locationMatches) {
     score += 15;
@@ -1270,45 +1284,60 @@ breakdown.skills.unmatched = unmatchedSkills;
   }
 
   
-// 4. Experience Match (15%)
-const profileExperience = normalize(
-  userProfile.experience || "fresher"
-);
 
-const jobExperience = normalize(
-  job.experience || "not specified"
-);
+  // 4. Experience Match (15%)
+  const profileExperience = normalize(
+    userProfile.experience || "fresher"
+  );
 
-if (profileExperience === "fresher") {
-  if (jobExperience === "fresher") {
-    // Explicitly suitable for freshers
-    score += 15;
-    breakdown.experience.score = 15;
-    breakdown.experience.matched = true;
-  } else if (jobExperience === "not specified") {
-    // Unknown requirement: do not assume compatibility
-    breakdown.experience.score = 0;
-    breakdown.experience.matched = false;
-  } else {
-    // Extract the stated experience requirement
-    const experienceMatch = jobExperience.match(
-      /(\d+(?:\.\d+)?)/
-    );
+  const jobExperience = normalize(
+    job.experience || "not specified"
+  );
 
-    if (experienceMatch) {
-      const minimumExperience = parseFloat(
-        experienceMatch[1]
+  if (profileExperience === "fresher") {
+    if (
+      jobExperience === "fresher" ||
+      /\b(entry[- ]level|no experience|0 years?|0-1 years?|0 to 1 years?)\b/i.test(
+        jobExperience
+      )
+    ) {
+      // Explicitly suitable for freshers
+      score += 15;
+      breakdown.experience.score = 15;
+      breakdown.experience.matched = true;
+    } else if (jobExperience === "not specified") {
+      // Unknown requirement: award partial credit
+      score += 7;
+      breakdown.experience.score = 7;
+      breakdown.experience.matched = false;
+    } else {
+      // Check the stated experience requirement
+      const experienceMatch = jobExperience.match(
+        /(\d+(?:\.\d+)?)/
       );
 
-      if (minimumExperience <= 1) {
-        // Suitable for entry-level candidates
+      if (experienceMatch) {
+        const minimumExperience = parseFloat(
+          experienceMatch[1]
+        );
+
+        if (minimumExperience <= 1) {
+          score += 15;
+          breakdown.experience.score = 15;
+          breakdown.experience.matched = true;
+        }
+      } else if (
+        /\b(fresher|entry[- ]level|junior|graduate|intern(ship)?)\b/i.test(
+          jobExperience
+        )
+      ) {
         score += 15;
         breakdown.experience.score = 15;
         breakdown.experience.matched = true;
       }
     }
   }
-}
+
 
 return {
   score: Math.round(score),

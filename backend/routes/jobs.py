@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from dotenv import load_dotenv
+from datetime import datetime, timezone, timedelta
 import os
 import re
 import requests
@@ -119,38 +120,13 @@ def extract_skills(text):
     return found_skills
 
 
+
 def extract_experience(text):
     text = text or ""
     lower_text = text.lower()
 
-    # Fresher / entry-level indicators
-    fresher_terms = [
-        "fresher",
-        "freshers",
-        "fresh graduate",
-        "fresh graduates",
-        "recent graduate",
-        "recent graduates",
-        "entry-level",
-        "entry level",
-        "no experience required",
-        "without experience",
-        "0 years",
-        "0.00 years",
-        "0-1 years",
-        "0–1 years",
-        "0 to 1 years",
-        "0.00-1.00 years",
-        "0.00–1.00 years",
-    ]
-
-    if any(term in lower_text for term in fresher_terms):
-        return "Fresher"
-
-    # Experience ranges such as:
-    # 3-6 years
-    # 0.00-1.00 years
-    # 2 to 5 years
+    # 1. Check explicit experience ranges first.
+    # Examples: 0-1 years, 2-5 years, 3 to 6 yrs
     range_match = re.search(
         r"\b(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*"
         r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\b",
@@ -158,30 +134,27 @@ def extract_experience(text):
     )
 
     if range_match:
-        min_years = range_match.group(1)
-        max_years = range_match.group(2)
+        min_years = float(range_match.group(1))
+        max_years = float(range_match.group(2))
 
-        if float(max_years) <= 1:
+        if max_years <= 1:
             return "Fresher"
 
-        return f"{min_years}-{max_years} years"
+        return f"{min_years:g}-{max_years:g} years"
 
-    # Expressions such as:
-    # 5+ years
-    # 2+ yrs
+    # 2. Check requirements such as 2+ years or 5+ yrs.
     plus_match = re.search(
         r"\b(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)\b",
         lower_text,
     )
 
     if plus_match:
-        return f"{plus_match.group(1)}+ years"
+        years = float(plus_match.group(1))
+        return f"{years:g}+ years"
 
-    # Expressions such as:
-    # 2 years experience
-    # 2 years of experience
-    # minimum 2 years
-    # at least 2 years
+    # 3. Check single experience requirements.
+    # Examples: minimum 2 years, 3 years of experience,
+    # experience required: 4 years.
     single_match = re.search(
         r"(?:minimum|min|at least|"
         r"experience|experienced|"
@@ -199,8 +172,56 @@ def extract_experience(text):
 
         return f"{years:g}+ years"
 
+    # 4. Use fresher indicators only when no numeric
+    # experience requirement was found.
+    fresher_terms = [
+        "fresher",
+        "freshers",
+        "fresh graduate",
+        "fresh graduates",
+        "recent graduate",
+        "recent graduates",
+        "entry-level",
+        "entry level",
+        "no experience required",
+        "without experience",
+        "0 years",
+        "0.00 years",
+    ]
+
+    if any(term in lower_text for term in fresher_terms):
+        return "Fresher"
+
     return "Not specified"
 
+
+if __name__ == "__main__":
+    test_cases = [
+        ("Entry-level role, 0-1 years of experience", "Fresher"),
+        ("Minimum 2 years of experience required", "2+ years"),
+        ("Experience: 3-6 years", "3-6 years"),
+        ("Candidates with 5+ years experience", "5+ years"),
+        ("Recent graduates welcome", "Fresher"),
+        ("We are looking for a data analyst", "Not specified"),
+    ]
+
+    skill_test = """
+    We are hiring a Data Analyst with Python, SQL, Excel,
+    Power BI, Pandas, NumPy, and Machine Learning skills.
+    Experience with data visualization and reporting is preferred.
+    """
+
+    print("SKILL TEST:", extract_skills(skill_test))
+
+    for description, expected in test_cases:
+        actual = extract_experience(description)
+        result = "PASS" if actual == expected else "FAIL"
+
+        print(
+            f"{result}: {description}\n"
+            f"  Expected: {expected} | Actual: {actual}"
+        )
+        
 # Sample job listings for testing
 # These are illustrative, not real job openings.
 jobs_data = [
@@ -387,13 +408,40 @@ def get_jobs():
         "bi analyst",
     ]
 
-    filtered_jobs = [
-        job for job in external_jobs
-        if any(
-            term in job["title"].lower()
-            for term in relevant_terms
-        )
-    ]
+    
+
+
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
+
+    filtered_jobs = []
+
+    for job in external_jobs:
+        title = job.get("title", "").lower()
+
+        # Keep only relevant job titles.
+        if not any(term in title for term in relevant_terms):
+            continue
+
+        # Skip jobs with missing or invalid posting dates.
+        created = job.get("created")
+
+        if not created:
+            continue
+
+        try:
+            posted_date = datetime.fromisoformat(
+                created.replace("Z", "+00:00")
+            )
+
+            if posted_date < cutoff_date:
+                continue
+
+        except (ValueError, TypeError):
+            continue
+
+        filtered_jobs.append(job)
+
+    
 
     if filtered_jobs:
         return jsonify({
