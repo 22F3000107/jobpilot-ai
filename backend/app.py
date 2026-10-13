@@ -1,3 +1,4 @@
+import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 
@@ -9,10 +10,40 @@ from routes.applications import applications_bp
 
 app = Flask(__name__)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///jobpilot.db"
+
+database_url = os.getenv("DATABASE_URL", "sqlite:///jobpilot.db")
+
+# Convert PostgreSQL URL to the psycopg 3 driver
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace(
+        "postgres://", "postgresql+psycopg://", 1
+    )
+elif database_url.startswith("postgresql://"):
+    database_url = database_url.replace(
+        "postgresql://", "postgresql+psycopg://", 1
+    )
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-CORS(app)
+
+frontend_origins = os.getenv(
+    "FRONTEND_URL",
+    "http://localhost:5173,http://127.0.0.1:5173"
+).split(",")
+
+CORS(
+    app,
+    resources={
+        r"/api/*": {
+            "origins": [
+                origin.strip()
+                for origin in frontend_origins
+                if origin.strip()
+            ]
+        }
+    }
+)
 
 db.init_app(app)
 
