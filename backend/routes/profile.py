@@ -1,11 +1,27 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from models import db, UserProfile
 
 profile_bp = Blueprint("profile", __name__)
 
 
+
 @profile_bp.route("/", methods=["GET"])
 def get_profile():
+
+    # Public demo: return fictional profile data
+    if current_app.config.get("DEMO_MODE", False):
+        return jsonify({
+            "id": 0,
+            "full_name": "Demo User",
+            "email": "demo@example.com",
+            "education": "Data Science Student",
+            "skills": ["Python", "SQL", "Machine Learning", "Flask"],
+            "preferred_roles": ["Data Analyst", "Data Scientist"],
+            "preferred_locations": ["Bengaluru", "Remote"],
+            "experience_level": "Fresher"
+        }), 200
+
+    # Existing local functionality
     profile = UserProfile.query.first()
 
     if not profile:
@@ -25,6 +41,14 @@ def get_profile():
 
 @profile_bp.route("/", methods=["POST"])
 def save_profile():
+
+    if current_app.config.get("DEMO_MODE", False):
+        return jsonify({
+            "error": "Profile editing is disabled in demo mode."
+        }), 403
+
+
+
     data = request.get_json(silent=True) or {}
 
     full_name = data.get("full_name", "").strip()

@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from models import db, SavedJob
 
 saved_jobs_bp = Blueprint("saved_jobs", __name__)
@@ -7,6 +7,14 @@ saved_jobs_bp = Blueprint("saved_jobs", __name__)
 # GET: Retrieve all saved jobs
 @saved_jobs_bp.route("/", methods=["GET"])
 def get_saved_jobs():
+
+    if current_app.config.get("DEMO_MODE", False):
+        return jsonify({
+            "error": "Saved Jobs is disabled in public demo mode."
+        }), 403
+
+
+
     saved_jobs = SavedJob.query.order_by(
         SavedJob.saved_at.desc()
     ).all()
@@ -17,6 +25,13 @@ def get_saved_jobs():
 # POST: Save a job
 @saved_jobs_bp.route("/", methods=["POST"])
 def save_job():
+
+    if current_app.config.get("DEMO_MODE", False):
+        return jsonify({
+            "error": "Saved Jobs is disabled in public demo mode."
+        }), 403
+
+
     data = request.get_json()
 
     if not data:
@@ -63,6 +78,14 @@ def save_job():
 # DELETE: Remove a saved job
 @saved_jobs_bp.route("/<int:saved_job_id>", methods=["DELETE"])
 def delete_saved_job(saved_job_id):
+
+    if current_app.config.get("DEMO_MODE", False):
+        return jsonify({
+            "error": "Saved Jobs is disabled in public demo mode."
+        }), 403
+
+
+
     saved_job = db.session.get(SavedJob, saved_job_id)
 
     if not saved_job:

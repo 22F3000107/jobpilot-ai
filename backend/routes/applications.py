@@ -1,8 +1,15 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from datetime import date
 from models import db, Application
 
 applications_bp = Blueprint("applications", __name__)
+
+@applications_bp.before_request
+def protect_demo_applications():
+    if current_app.config.get("DEMO_MODE", False):
+        return jsonify({
+            "error": "Applications is disabled in public demo mode."
+        }), 403
 
 VALID_STATUSES = [
     "Applied",

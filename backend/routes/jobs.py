@@ -411,7 +411,17 @@ def get_jobs():
     
 
 
-    cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
+    
+    # Job freshness filter: 1, 3, 7, or 30 days
+    try:
+        days = int(request.args.get("days", 1))
+    except (ValueError, TypeError):
+        days = 1
+
+    if days not in (1, 3, 7, 30):
+        days = 1
+
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     filtered_jobs = []
 
@@ -451,11 +461,13 @@ def get_jobs():
             "jobs": filtered_jobs,
         })
 
+    
     return jsonify({
         "success": True,
-        "source": "Sample",
-        "total": len(jobs_data),
-        "jobs": jobs_data,
+        "source": "Adzuna",
+        "total": 0,
+        "jobs": [],
+        "message": "No matching jobs found in the selected time period."
     })
 
 

@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://127.0.0.1:5000/api",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000/api",
   headers: {
     "Content-Type": "application/json",
   },
@@ -9,11 +9,17 @@ const api = axios.create({
 
 // ==================== JOBS API ====================
 
-export const getJobs = async (keyword = "data analyst", location = "Bengaluru") => {
+
+export const getJobs = async (
+  keyword = "data analyst",
+  location = "Bengaluru",
+  days = 7
+) => {
   const response = await api.get("/jobs/", {
     params: {
       keyword,
       location,
+      days,
     },
   });
 

@@ -207,7 +207,7 @@
     v-model="jobAge"
     class="form-select"
   >
-    <option value="all">All Jobs</option>
+    <option value="1">Last 24 hours</option>
     <option value="3">Last 3 days</option>
     <option value="7">Last 7 days</option>
     <option value="30">Last 30 days</option>
@@ -806,6 +806,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
+const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
 
 import Navbar from "./components/Navbar.vue";
 import StatsCard from "./components/StatsCard.vue";
@@ -835,7 +836,7 @@ const jobType = ref("");
 const remoteOnly = ref(false);
 const sortBy = ref("match");
 const minMatch = ref(0);
-const jobAge = ref("all");
+const jobAge = ref("7");
 const currentPage = ref(1);
 const jobsPerPage = ref(5);
 const loading = ref(false);
@@ -870,7 +871,7 @@ async function loadJobs() {
 
   try {
     const [jobsData, profileData] = await Promise.all([
-      getJobs(),
+      getJobs("data analyst", "Bengaluru", Number(jobAge.value)),
       getProfile(),
     ]);
 
@@ -890,6 +891,10 @@ async function loadJobs() {
 }
 
 async function handleSaveJob(job) {
+  if (isDemoMode) {
+    alert("Saving jobs is disabled in this public demo.");
+    return;
+  }
   try {
     if (savedJobIds.value.includes(job.id)) {
       return;
@@ -919,6 +924,14 @@ async function handleSaveJob(job) {
 }
 
 async function loadSavedJobs() {
+  if (isDemoMode) {
+    savedJobs.value = [];
+    savedJobIds.value = [];
+    savedJobsError.value = "";
+    savedJobsLoading.value = false;
+    return;
+  }
+
   savedJobsLoading.value = true;
   savedJobsError.value = "";
 
@@ -941,6 +954,10 @@ async function loadSavedJobs() {
 }
 
 async function handleDeleteSavedJob(savedJobId) {
+  if (isDemoMode) {
+    alert("Deleting saved jobs is disabled in this public demo.");
+    return;
+  }
   const confirmed = window.confirm(
     "Are you sure you want to remove this saved job?"
   );
@@ -959,6 +976,10 @@ async function handleDeleteSavedJob(savedJobId) {
 }
 
 async function handleMarkApplied(job) {
+  if (isDemoMode) {
+    alert("Application tracking is disabled in this public demo.");
+    return;
+  }
   try {
     const jobId = job.job_id ?? job.id;
 
@@ -994,6 +1015,13 @@ async function handleMarkApplied(job) {
 }
 
 async function loadApplications() {
+  if (isDemoMode) {
+    applications.value = [];
+    applicationsError.value = "";
+    applicationsLoading.value = false;
+    return;
+  }
+
   applicationsLoading.value = true;
   applicationsError.value = "";
 
@@ -1012,6 +1040,10 @@ async function loadApplications() {
 }
 
 async function handleUpdateApplication(applicationId, status) {
+  if (isDemoMode) {
+    alert("Updating application status is disabled in this public demo.");
+    return;
+  }
   try {
     const response = await updateApplication(applicationId, { status });
 
@@ -1029,6 +1061,10 @@ async function handleUpdateApplication(applicationId, status) {
 }
 
 async function handleSaveNotes(application) {
+  if (isDemoMode) {
+    alert("Editing application notes is disabled in this public demo.");
+    return;
+  }
   try {
     await updateApplication(application.id, {
       notes: application.notes || "",
@@ -1042,6 +1078,10 @@ async function handleSaveNotes(application) {
 }
 
 async function handleSaveFollowUp(application) {
+  if (isDemoMode) {
+    alert("Editing follow-up reminders is disabled in this public demo.");
+    return;
+  }
   try {
     await updateApplication(application.id, {
       follow_up_date: application.follow_up_date || null,
@@ -1055,6 +1095,10 @@ async function handleSaveFollowUp(application) {
 }
 
 async function handleDeleteApplication(applicationId) {
+  if (isDemoMode) {
+    alert("Deleting applications is disabled in this public demo.");
+    return;
+  }
   const confirmed = window.confirm(
     "Are you sure you want to delete this application?"
   );
@@ -1519,6 +1563,11 @@ watch(
     currentPage.value = 1;
   }
 );
+
+
+watch(jobAge, () => {
+  loadJobs();
+});
 
 const sortedJobs = computed(() => {
 

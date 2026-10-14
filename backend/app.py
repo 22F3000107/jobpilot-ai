@@ -10,6 +10,7 @@ from routes.applications import applications_bp
 
 app = Flask(__name__)
 
+app.config["DEMO_MODE"] = os.getenv("DEMO_MODE", "false").lower() == "true"
 
 database_url = os.getenv("DATABASE_URL", "sqlite:///jobpilot.db")
 

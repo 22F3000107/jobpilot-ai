@@ -125,9 +125,9 @@
           <button
             type="submit"
             class="btn btn-primary px-4 py-2"
-            :disabled="saving"
+            :disabled="saving || isDemoMode"
           >
-            {{ saving ? "Saving..." : "Save Profile" }}
+            {{ isDemoMode ? "View Only — Demo Mode" : saving ? "Saving..." : "Save Profile" }}
           </button>
 
         </form>
@@ -139,6 +139,7 @@
 <script setup>
 import { ref, reactive, onMounted } from "vue";
 import { getProfile, saveProfile } from "../services/api";
+const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
 
 const form = reactive({
   full_name: "",
@@ -182,6 +183,12 @@ async function loadProfile() {
 }
 
 async function handleSave() {
+  if (isDemoMode) {
+    errorMessage.value = "Profile editing is disabled in this public demo.";
+    successMessage.value = "";
+    return;
+  }
+
   saving.value = true;
   successMessage.value = "";
   errorMessage.value = "";
