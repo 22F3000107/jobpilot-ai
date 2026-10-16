@@ -1,9 +1,12 @@
 from flask import Blueprint, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 from datetime import datetime, timezone, timedelta
 import os
 import re
 import requests
+import time
 
 
 load_dotenv()
@@ -12,6 +15,16 @@ ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID")
 ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY")
 
 jobs_bp = Blueprint("jobs", __name__)
+
+jobs_limiter = Limiter(
+    get_remote_address,
+    default_limits=[],
+)
+
+# Cache Adzuna responses for 5 minutes
+ADZUNA_CACHE = {}
+CACHE_TTL = 300
+MAX_CACHE_ENTRIES = 100
 
 KNOWN_SKILLS = [
     # Programming
@@ -297,6 +310,15 @@ def fetch_adzuna_jobs(keyword="", location=""):
     into JobPilot's internal job format.
     """
 
+    cache_key = (keyword.strip().lower(), location.strip().lower())
+    current_time = time.monotonic()
+
+    cached = ADZUNA_CACHE.get(cache_key)
+
+    if cached and current_time - cached["timestamp"] < CACHE_TTL:
+        print("Returning cached Adzuna jobs")
+        return cached["jobs"]
+
     if not ADZUNA_APP_ID or not ADZUNA_APP_KEY:
         return []
 
@@ -369,6 +391,33 @@ def fetch_adzuna_jobs(keyword="", location=""):
                 "salary_min": job.get("salary_min"),
                 "salary_max": job.get("salary_max"),
             })
+
+
+        # Remove expired entries before caching new results
+        now = time.monotonic()
+
+        expired_keys = [
+            key for key, value in ADZUNA_CACHE.items()
+            if now - value["timestamp"] >= CACHE_TTL
+        ]
+
+        for key in expired_keys:
+            del ADZUNA_CACHE[key]
+
+        # Evict the oldest entry when the cache is full
+        if cache_key not in ADZUNA_CACHE and len(ADZUNA_CACHE) >= MAX_CACHE_ENTRIES:
+            oldest_key = min(
+                ADZUNA_CACHE,
+                key=lambda key: ADZUNA_CACHE[key]["timestamp"]
+            )
+            del ADZUNA_CACHE[oldest_key]
+
+        ADZUNA_CACHE[cache_key] = {
+             "timestamp": time.monotonic(),
+             "jobs": normalized_jobs,
+        }
+
+        print("Adzuna jobs cached for 5 minutes")
 
         return normalized_jobs
 

@@ -8,7 +8,15 @@ from routes.profile import profile_bp
 from routes.saved_jobs import saved_jobs_bp
 from routes.applications import applications_bp
 
+from extensions import limiter
+
 app = Flask(__name__)
+
+app.config["RATELIMIT_STORAGE_URI"] = os.getenv(
+    "RATELIMIT_STORAGE_URI", "memory://"
+)
+
+limiter.init_app(app)
 
 app.config["DEMO_MODE"] = os.getenv("DEMO_MODE", "false").lower() == "true"
 
