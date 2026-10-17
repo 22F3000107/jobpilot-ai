@@ -15,10 +15,7 @@ ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY")
 
 jobs_bp = Blueprint("jobs", __name__)
 
-jobs_limiter = Limiter(
-    get_remote_address,
-    default_limits=[],
-)
+
 
 # Cache Adzuna responses for 5 minutes
 ADZUNA_CACHE = {}
