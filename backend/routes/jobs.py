@@ -1,6 +1,5 @@
 from flask import Blueprint, jsonify, request
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+from extensions import limiter
 from dotenv import load_dotenv
 from datetime import datetime, timezone, timedelta
 import os
@@ -427,6 +426,7 @@ def fetch_adzuna_jobs(keyword="", location=""):
 
 # Get all jobs
 @jobs_bp.route("/", methods=["GET"])
+@limiter.limit("10 per minute")
 def get_jobs():
     keyword = request.args.get(
         "keyword",
@@ -578,6 +578,7 @@ def search_jobs():
 
 
 @jobs_bp.route("/external", methods=["GET"])
+@limiter.limit("10 per minute")
 def get_external_jobs():
     keyword = request.args.get("keyword", "data analyst")
     location = request.args.get("location", "Bengaluru")
