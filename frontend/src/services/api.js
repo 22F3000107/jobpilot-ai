@@ -13,7 +13,7 @@ const api = axios.create({
 export const getJobs = async (
   keyword = "data analyst",
   location = "Bengaluru",
-  days = 7
+  days = 1
 ) => {
   const response = await api.get("/jobs/", {
     params: {

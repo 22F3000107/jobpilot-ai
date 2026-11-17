@@ -836,7 +836,7 @@ const jobType = ref("");
 const remoteOnly = ref(false);
 const sortBy = ref("match");
 const minMatch = ref(0);
-const jobAge = ref("7");
+const jobAge = ref("1");
 const currentPage = ref(1);
 const jobsPerPage = ref(5);
 const loading = ref(false);
@@ -871,7 +871,11 @@ async function loadJobs() {
 
   try {
     const [jobsData, profileData] = await Promise.all([
-      getJobs("data analyst", "Bengaluru", Number(jobAge.value)),
+      getJobs(
+  keyword.value.trim() || "data analyst",
+  location.value.trim() || "Bengaluru",
+  Number(jobAge.value)
+),
       getProfile(),
     ]);
 
@@ -1413,7 +1417,8 @@ function getJobPriority(job) {
 
   const isFresh =
     jobAgeDays !== null &&
-    jobAgeDays <= 3;
+    jobAgeDays >= 0 &&
+    jobAgeDays <= 1;
 
   const isRecent =
     jobAgeDays !== null &&

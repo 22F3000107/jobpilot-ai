@@ -8,6 +8,33 @@ import requests
 import time
 
 
+
+def is_job_within_date_range(created, days=1, now=None):
+    """
+    Check whether a job was posted within the selected date range.
+    Reject missing, invalid and future timestamps.
+    """
+
+    if not created:
+        return False
+
+    try:
+        posted_date = datetime.fromisoformat(
+            created.replace("Z", "+00:00")
+        )
+
+        if posted_date.tzinfo is None:
+            posted_date = posted_date.replace(tzinfo=timezone.utc)
+
+        current_time = now or datetime.now(timezone.utc)
+        cutoff_date = current_time - timedelta(days=days)
+
+        return cutoff_date <= posted_date <= current_time
+
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
 load_dotenv()
 
 ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID")
@@ -467,36 +494,24 @@ def get_jobs():
     if days not in (1, 3, 7, 30):
         days = 1
 
-    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     filtered_jobs = []
 
     for job in external_jobs:
-        title = job.get("title", "").lower()
+        title = (job.get("title") or "").lower()
 
         # Keep only relevant job titles.
         if not any(term in title for term in relevant_terms):
             continue
 
-        # Skip jobs with missing or invalid posting dates.
-        created = job.get("created")
-
-        if not created:
-            continue
-
-        try:
-            posted_date = datetime.fromisoformat(
-                created.replace("Z", "+00:00")
-            )
-
-            if posted_date < cutoff_date:
-                continue
-
-        except (ValueError, TypeError):
+        # Validate job posting date.
+        if not is_job_within_date_range(
+            job.get("created"),
+            days=days,
+        ):
             continue
 
         filtered_jobs.append(job)
-
     
 
     if filtered_jobs:
