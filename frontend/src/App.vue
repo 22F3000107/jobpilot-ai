@@ -1215,6 +1215,39 @@ function normalizeSkill(skill) {
 
 
 
+function parseExperienceRequirement(experience) {
+  const value = normalize(experience || "");
+
+  if (!value || value === "not specified") {
+    return { type: "unknown", min: null, max: null };
+  }
+
+  if (
+    /\b(fresher|entry[- ]level|no experience|graduate|intern(ship)?)\b/i.test(value)
+  ) {
+    return { type: "entry", min: 0, max: 0 };
+  }
+
+  const numbers = value.match(/\d+(?:\.\d+)?/g);
+
+  if (!numbers) {
+    return { type: "unknown", min: null, max: null };
+  }
+
+  const min = Number(numbers[0]);
+  const max = numbers.length > 1 ? Number(numbers[1]) : null;
+
+  if (/\+|and above|or more|minimum|at least/i.test(value)) {
+    return { type: "minimum", min, max: null };
+  }
+
+  if (max !== null) {
+    return { type: "range", min, max };
+  }
+
+  return { type: "exact", min, max: null };
+}
+
 function calculateMatchScore(job, userProfile) {
   if (!userProfile) {
     return {
@@ -1333,58 +1366,40 @@ if (jobSkills.length > 0 && userSkills.length > 0) {
 
   
 
-  // 4. Experience Match (15%)
+    // 4. Experience Match (15%)
   const profileExperience = normalize(
     userProfile.experience || "fresher"
   );
 
-  const jobExperience = normalize(
-    job.experience || "not specified"
+  const jobExperience = parseExperienceRequirement(
+    job.experience
   );
 
   if (profileExperience === "fresher") {
-    if (
-      jobExperience === "fresher" ||
-      /\b(entry[- ]level|no experience|0 years?|0-1 years?|0 to 1 years?)\b/i.test(
-        jobExperience
-      )
-    ) {
-      // Explicitly suitable for freshers
+    if (jobExperience.type === "entry") {
       score += 15;
       breakdown.experience.score = 15;
       breakdown.experience.matched = true;
-    } else if (jobExperience === "not specified") {
-      // Unknown requirement: award partial credit
+    } else if (jobExperience.type === "unknown") {
       score += 7;
       breakdown.experience.score = 7;
       breakdown.experience.matched = false;
-    } else {
-      // Check the stated experience requirement
-      const experienceMatch = jobExperience.match(
-        /(\d+(?:\.\d+)?)/
-      );
-
-      if (experienceMatch) {
-        const minimumExperience = parseFloat(
-          experienceMatch[1]
-        );
-
-        if (minimumExperience <= 1) {
-          score += 15;
-          breakdown.experience.score = 15;
-          breakdown.experience.matched = true;
-        }
-      } else if (
-        /\b(fresher|entry[- ]level|junior|graduate|intern(ship)?)\b/i.test(
-          jobExperience
-        )
-      ) {
-        score += 15;
-        breakdown.experience.score = 15;
-        breakdown.experience.matched = true;
-      }
+    } else if (
+      (
+       jobExperience.type === "exact" &&
+       jobExperience.min <= 1
+      ) ||
+      (
+       jobExperience.type === "range" &&
+       jobExperience.max <= 1
+      )
+    ) {
+      score += 15;
+      breakdown.experience.score = 15;
+      breakdown.experience.matched = true;
     }
   }
+
 
 
 return {
@@ -1460,32 +1475,29 @@ function getExperienceWarning(job) {
     return "";
   }
 
-  const jobExperience = normalize(job.experience);
-
-  if (
-    jobExperience === "not specified" ||
-    jobExperience === "fresher"
-  ) {
-    return "";
-  }
-
-  const experienceMatch = jobExperience.match(
-    /(\d+(?:\.\d+)?)/
-  );
-
-  if (!experienceMatch) {
-    return "";
-  }
-
-  const minimumExperience = parseFloat(experienceMatch[1]);
-
   const profileExperience = normalize(
     profile.value?.experience || "fresher"
   );
 
+  if (profileExperience !== "fresher") {
+    return "";
+  }
+
+  const requirement = parseExperienceRequirement(
+    job.experience
+  );
+
   if (
-    profileExperience === "fresher" &&
-    minimumExperience > 1
+    requirement.type === "unknown" ||
+    requirement.type === "entry"
+  ) {
+    return "";
+  }
+
+  if (
+    requirement.type === "minimum" ||
+    requirement.min > 1 ||
+    requirement.max > 1
   ) {
     return `This job requires ${job.experience} of experience, while your profile is set to Fresher.`;
   }
