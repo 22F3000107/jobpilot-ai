@@ -40,6 +40,14 @@ load_dotenv()
 ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID")
 ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY")
 
+GREENHOUSE_BOARD_TOKENS = [
+    token.strip()
+    for token in os.getenv("GREENHOUSE_BOARD_TOKENS", "").split(",")
+    if token.strip()
+]
+
+GREENHOUSE_CACHE = {}
+
 jobs_bp = Blueprint("jobs", __name__)
 
 
@@ -448,6 +456,201 @@ def fetch_adzuna_jobs(keyword="", location=""):
         print(f"Adzuna API error: {error}")
         return []
 
+
+def fetch_greenhouse_jobs(keyword="", location=""):
+    """
+    Fetch jobs from configured Greenhouse company boards
+    and normalize them into JobPilot's internal format.
+    """
+
+    cache_key = (
+        keyword.strip().lower(),
+        location.strip().lower(),
+    )
+
+    current_time = time.monotonic()
+    cached = GREENHOUSE_CACHE.get(cache_key)
+
+    if cached and current_time - cached["timestamp"] < CACHE_TTL:
+        print("Returning cached Greenhouse jobs")
+        return cached["jobs"]
+
+    normalized_jobs = []
+
+    company_names = {
+        "sahajsoftware": "Sahaj Software",
+        "commerceiq": "CommerceIQ",
+        "cloudflare": "Cloudflare",
+        "sigmoid": "Sigmoid",
+        "gitlab": "GitLab",
+        "emergentlabsinc": "Emergent Labs",
+    }
+
+    keyword_terms = [
+        term.lower()
+        for term in keyword.split()
+        if term.strip()
+    ]
+
+    for board_token in GREENHOUSE_BOARD_TOKENS:
+
+        list_url = (
+            f"https://boards-api.greenhouse.io/v1/boards/"
+            f"{board_token}/jobs"
+        )
+
+        try:
+            response = requests.get(
+                list_url,
+                params={"content": "true"},
+                timeout=15,
+            )
+            response.raise_for_status()
+
+            jobs = response.json().get("jobs", [])
+
+        except (requests.RequestException, ValueError) as error:
+            print(f"Greenhouse board error ({board_token}): {error}")
+            continue
+
+        for job in jobs:
+
+            title = job.get("title") or ""
+
+            job_location = (
+                (job.get("location") or {}).get("name") or ""
+            )
+
+            description = job.get("content") or ""
+
+            title_lower = title.lower()
+
+            # Match all words from the requested keyword.
+            if keyword_terms and not all(
+               term in title_lower for term in keyword_terms
+            ):
+                continue
+
+            # Match the requested location or India-eligible remote roles.
+            location_lower = location.lower()
+            job_location_lower = job_location.lower()
+
+            location_matches = (
+                not location
+                or location_lower in job_location_lower
+            )
+
+            remote_india_eligible = (
+                "remote" in job_location_lower
+                and "india" in job_location_lower
+            )
+
+            if not location_matches and not remote_india_eligible:
+                continue
+
+            job_id = job.get("id")
+
+            if not job_id:
+                continue
+
+            detail_url = f"{list_url}/{job_id}"
+
+            try:
+                detail_response = requests.get(
+                    detail_url,
+                    timeout=15,
+                )
+                detail_response.raise_for_status()
+
+                details = detail_response.json()
+
+            except (requests.RequestException, ValueError) as error:
+                print(
+                    f"Greenhouse job detail error "
+                    f"({board_token}/{job_id}): {error}"
+                )
+                continue
+
+            # Use original publication date, not last updated date.
+            created = details.get("first_published")
+
+            if not created:
+                continue
+
+            full_description = (
+                details.get("content") or description
+            )
+
+            full_title = details.get("title") or title
+
+            full_location = (
+                (details.get("location") or {}).get("name")
+                or job_location
+                or "Location not specified"
+            )
+
+            normalized_jobs.append({
+                "id": f"greenhouse-{board_token}-{job_id}",
+                "title": full_title,
+                "company": company_names.get(
+                    board_token,
+                    board_token,
+                ),
+                "location": full_location,
+                "job_type": "Other",
+                "experience": extract_experience(full_description),
+                "skills": extract_skills(
+                    f"{full_title} {full_description}"
+                ),
+                "match_score": 0,
+                "apply_url": (
+                    details.get("absolute_url")
+                    or job.get("absolute_url", "")
+                ),
+                "description": full_description,
+                "source": "Greenhouse",
+                "created": created,
+                "salary_min": None,
+                "salary_max": None,
+            })
+
+    # Remove expired cache entries.
+    now = time.monotonic()
+
+    expired_keys = [
+        key
+        for key, value in GREENHOUSE_CACHE.items()
+        if now - value["timestamp"] >= CACHE_TTL
+    ]
+
+    for key in expired_keys:
+        del GREENHOUSE_CACHE[key]
+
+    # Keep the cache within its configured size.
+    if (
+        cache_key not in GREENHOUSE_CACHE
+        and len(GREENHOUSE_CACHE) >= MAX_CACHE_ENTRIES
+    ):
+        oldest_key = min(
+            GREENHOUSE_CACHE,
+            key=lambda key: GREENHOUSE_CACHE[key]["timestamp"],
+        )
+        del GREENHOUSE_CACHE[oldest_key]
+
+    GREENHOUSE_CACHE[cache_key] = {
+        "timestamp": time.monotonic(),
+        "jobs": normalized_jobs,
+    }
+
+    print(
+        f"Greenhouse: {len(normalized_jobs)} jobs fetched "
+        "and cached for 5 minutes"
+    )
+
+    return normalized_jobs
+
+
+
 # Get all jobs
 @jobs_bp.route("/", methods=["GET"])
 @limiter.limit("10 per minute")
@@ -462,9 +665,22 @@ def get_jobs():
         "Bengaluru"
     )
 
-    external_jobs = fetch_adzuna_jobs(
-        keyword=keyword,
-        location=location,
+    adzuna_jobs = fetch_adzuna_jobs(
+       keyword=keyword,
+       location=location,
+    )
+
+    greenhouse_jobs = fetch_greenhouse_jobs(
+       keyword=keyword,
+       location=location,
+    )
+
+    external_jobs = adzuna_jobs + greenhouse_jobs
+
+    print(
+        f"Job sources: Adzuna={len(adzuna_jobs)}, "
+        f"Greenhouse={len(greenhouse_jobs)}, "
+        f"Combined={len(external_jobs)}"
     )
 
     # Keep only roles relevant to your target careers
@@ -514,18 +730,55 @@ def get_jobs():
         filtered_jobs.append(job)
     
 
-    if filtered_jobs:
+        # Deduplicate jobs using company, title, and location.
+    unique_jobs = {}
+
+    for job in filtered_jobs:
+        dedup_key = (
+            " ".join((job.get("company") or "").lower().split()),
+            " ".join((job.get("title") or "").lower().split()),
+            " ".join((job.get("location") or "").lower().split()),
+        )
+
+        existing_job = unique_jobs.get(dedup_key)
+
+        if existing_job is None:
+            unique_jobs[dedup_key] = job
+
+        # Prefer Greenhouse because it provides a direct employer
+        # application link when the same job exists on both sources.
+        elif (
+            job.get("source") == "Greenhouse"
+            and existing_job.get("source") != "Greenhouse"
+        ):
+            unique_jobs[dedup_key] = job
+
+    final_jobs = list(unique_jobs.values())
+
+    # Identify the sources contributing to the final results.
+    source_names = {
+        job.get("source")
+        for job in final_jobs
+        if job.get("source")
+    }
+
+    source_label = " + ".join(
+        source
+        for source in ("Adzuna", "Greenhouse")
+        if source in source_names
+    ) or "Adzuna + Greenhouse"
+
+    if final_jobs:
         return jsonify({
             "success": True,
-            "source": "Adzuna",
-            "total": len(filtered_jobs),
-            "jobs": filtered_jobs,
+            "source": source_label,
+            "total": len(final_jobs),
+            "jobs": final_jobs,
         })
 
-    
     return jsonify({
         "success": True,
-        "source": "Adzuna",
+        "source": source_label,
         "total": 0,
         "jobs": [],
         "message": "No matching jobs found in the selected time period."
